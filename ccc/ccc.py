@@ -37,10 +37,14 @@ def run_server(server_path, ciphersuite_id, out_file, show_output=True):
     p = subprocess.Popen(args, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
 
+    return_code = p.returncode
+    if return_code == -27:
+        return_code = 0
+
     if (show_output):
         print(f'\n\nServer OUT:\n{stdout}')
         print(f'\n\nServer ERR:\n{stderr}')
-    return p.returncode
+    return return_code
 
 def run_client(client_path, ciphersuite_id, out_file, show_output=True):
     args = ['valgrind', '--tool=callgrind', f'--callgrind-out-file={out_file}',
@@ -49,7 +53,11 @@ def run_client(client_path, ciphersuite_id, out_file, show_output=True):
     p = subprocess.Popen(args, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
 
+    return_code = p.returncode
+    if return_code == -27:
+        return_code = 0
+
     if (show_output):
         print(f'\n\nClient OUT:\n{stdout}')
         print(f'\n\nClient ERR:\n{stderr}')
-    return p.returncode
+    return return_code

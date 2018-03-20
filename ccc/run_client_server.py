@@ -70,8 +70,6 @@ def run(client_path, server_path, ciphersuite_list_file_path, srv_funcs_to_prof,
         print(f'\tStarting client... (Out file: {callgrind_out_cli})')
         async_result_cli = pool.apply_async(run_client, (CLIENT_PATH, sc_id, callgrind_out_cli, verbose))
 
-        async_result_srv.join()
-        async_result_cli.join()
         srv_res = async_result_srv.get()
         cli_res = async_result_cli.get()
 
