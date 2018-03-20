@@ -1,21 +1,42 @@
-from multiprocessing.pool import ThreadPool
-from .ccc import parse_ciphersuite_list_from_file, run_server, run_client
-from multiprocessing.pool import ThreadPool
 import time
+import argparse
+from multiprocessing.pool import ThreadPool
 
-def run():
-    TIMEOUT = 2
-    CLIENT_PATH = None
-    SERVER_PATH = None
-    CIPHERSUITE_LIST_PATH = None
-    FUNCTIONS_TO_PROFILE = []
+from ccc import parse_ciphersuite_list_from_file, run_server, run_client, get_cc_from_callgrind_file
 
+def run(client_path, server_path, ciphersuite_list_file_path, srv_funcs_to_prof, cli_funcs_to_prof, timeout=2, verbose=False):
+    SERVER_CALLGRIND_OUT_FILE = 'callgrind.out.server.{}'
+    CLIENT_CALLGRIND_OUT_FILE = 'callgrind.out.client.{}'
     # { 'sc_id': [{'function_name', 'number_of_cycles'}] }
-    PROFILE_RESULTS = {}
+    PROFILE_RESULTS_SRV = {}
+    PROFILE_RESULTS_CLI = {}
 
+
+    # User-defined args
+    CLIENT_PATH = client_path
+    SERVER_PATH = server_path
+    CIPHERSUITE_LIST_PATH = ciphersuite_list_file_path
+    SRV_FUNCTIONS_TO_PROFILE = srv_funcs_to_prof
+    CLI_FUNCTIONS_TO_PROFILE = cli_funcs_to_prof
+    TIMEOUT = timeout
+    VERBOSE = verbose
+
+    print('Running with configurations: ')
+    print(f'\tClient Path: {CLIENT_PATH}')
+    print(f'\tSever Path: {SERVER_PATH}')
+    print(f'\tCiphesuite List Path: {CIPHERSUITE_LIST_PATH}')
+    print(f'\tServer Funcs To Prof: {SRV_FUNCTIONS_TO_PROFILE}')
+    print(f'\tClient Funcs To Prof: {CLI_FUNCTIONS_TO_PROFILE}')
+    print(f'\tTimeout: {TIMEOUT}')
+    print(f'\tVerbose: {VERBOSE}')
+    print('\n')
+
+    print('Parsing ciphersuties...',end='')
     ciphersuites = parse_ciphersuite_list_from_file(CIPHERSUITE_LIST_PATH)
-    num_cipheruites = ciphersuites
+    num_cipheruites = len(ciphersuites)
     num_skipped_ciphersuites = 0
+    num_procecessed_ciphersuites = 0
+    print('OK')
 
     for sc_id, name, flags in ciphersuites:
         """
@@ -28,29 +49,80 @@ def run():
         5. Parse cycles for selected functions
         """
         pool = ThreadPool(processes=2)
-        
-        print('Starting server...')
-        async_result_srv = pool.apply_async(run_server, (sc_id,))
-        print(f'\t,Waiting {TIMEOUT} seconds for server to load...')
-        time.sleep(TIMEOUT) # give the server time to start
-        print('Starting client...')
-        async_result_cli = pool.apply_async(run_client, (sc_id,))
+        num_procecessed_ciphersuites += 1
+        callgrind_out_srv = SERVER_CALLGRIND_OUT_FILE.format(sc_id)
+        callgrind_out_cli = CLIENT_CALLGRIND_OUT_FILE.format(sc_id)
 
+        print(f'--- Begin profiling for {sc_id} : {name} : {flags} [{num_procecessed_ciphersuites}/{num_cipheruites}] ---')
+
+        print(f'\tStarting server... (Out file: {callgrind_out_srv})')
+
+        if sc_id == '49311':
+            verbose = True
+        else:
+            verbose = False
+
+        async_result_srv = pool.apply_async(run_server, (SERVER_PATH, sc_id, callgrind_out_srv, verbose))
+
+        print(f'\t\tWaiting {TIMEOUT} seconds for server to load...')
+        time.sleep(TIMEOUT) # give the server time to start
+
+        print(f'\tStarting client... (Out file: {callgrind_out_cli})')
+        async_result_cli = pool.apply_async(run_client, (CLIENT_PATH, sc_id, callgrind_out_cli, verbose))
+
+        async_result_srv.join()
+        async_result_cli.join()
         srv_res = async_result_srv.get()
         cli_res = async_result_cli.get()
 
         if srv_res != 0 or cli_res != 0:
-            print(f'[!!!] Non-zero return code from ciphersuite {sc_id} {name} {flags}')
-            print('\tSkipping to next ciphersuite...')
+            print(f'\n\t[!!!] Non-zero return code from ciphersuite {sc_id} {name} {flags}')
+            print(f'\t\tServer: {srv_res} Client: {cli_res}')
+            print('\t\tSkipping to next ciphersuite...\n')
             num_skipped_ciphersuites += 1
             continue
 
-        pass
+        print('\tParsing CPU Cycles...')
 
-        print('--- STATISTICS ---')
-        print(f'\tTotal CipherSuites:{num_cipheruites}'
-        '\nMeasured: {num_cipheruites - num_skipped_ciphersuites}\n'
-        'Skipped: {num_skipped_ciphersuites}')
+        # 5. Parse the cycles for selected functions
+
+        #    5.1 Server
+        time.sleep(TIMEOUT)
+        print(f'\t\tWaiting {TIMEOUT} seconds for callgrind output to flush...')
+        print('\t\tParsing server....')
+        PROFILE_RESULTS_SRV[sc_id] = []
+        for function_name in SRV_FUNCTIONS_TO_PROFILE:
+            num_cc = get_cc_from_callgrind_file(callgrind_out_srv, function_name)
+            print(f'\t\t\t{function_name}: {num_cc}')
+            PROFILE_RESULTS_SRV[sc_id].append({function_name: num_cc})
+
+        #   5.2 Client
+        print('\t\tParsing client...')
+        PROFILE_RESULTS_CLI[sc_id] = []
+        for function_name in CLI_FUNCTIONS_TO_PROFILE:
+            num_cc = get_cc_from_callgrind_file(callgrind_out_cli, function_name)
+            print(f'\t\t\t{function_name}: {num_cc}')
+            PROFILE_RESULTS_CLI[sc_id].append({function_name: num_cc})
+
+        print(f'--- End profiling for {sc_id} : {name} : {flags} [{num_procecessed_ciphersuites}/{num_cipheruites}] ---\n')
+
+    print('--- STATISTICS ---')
+    print(f'\tTotal CipherSuites:{num_cipheruites}'
+    '\nMeasured: {num_cipheruites - num_skipped_ciphersuites}\n'
+    'Skipped: {num_skipped_ciphersuites}')
+
+    import pdb; pdb.set_trace()
 
 if __name__ == '__main__':
-    run()
+    parser = argparse.ArgumentParser(description='Run mbedTLS server and client program and collect profiling metrics for a list of ciphersuties.')
+    parser.add_argument('client', type=str, help='client program path')
+    parser.add_argument('server', type=str, help='server program path')
+    parser.add_argument('ciphersuite_list', type=str, help='path to file containing a list of cipherstuies (format per line: ciphersuite_ID ciphersutie_name ciphersuite_flags)')
+    parser.add_argument('--sf', nargs='*', help='name of server functions to profile')
+    parser.add_argument('--cf', nargs='*', help='name of client functions to profile')
+    parser.add_argument('-t', '--timeout', type=int, default=2, help='time to wait after starting the server before starting the client')
+    parser.add_argument('-v', '--verbose', action='store_true', default=False, help='Enable verbose output')
+
+    args = parser.parse_args()
+
+    run(args.client, args.server, args.ciphersuite_list, args.sf, args.cf, args.timeout, args.verbose)
