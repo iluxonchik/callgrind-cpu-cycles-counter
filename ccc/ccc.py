@@ -19,7 +19,7 @@ def get_cc_from_callgrind_output(content, func_name):
     res = pattern.search(content)
 
     func_id = res.group('func_id')
-    REGEX = fr'cfn=\({func_id}\).*?\ncalls=.+\n\* (?P<cpu_cycles>\d+)'
+    REGEX = fr'cfn=\({func_id}\).*?\ncalls=.+\n\d+ (?P<cpu_cycles>\d+)'
     pattern = re.compile(REGEX)
     res = pattern.search(content)
     return int(res.group('cpu_cycles'))
@@ -39,8 +39,6 @@ def run_server(server_path, ciphersuite_id, out_file, show_output=True):
     stdout, stderr = p.communicate()
 
     return_code = p.returncode
-    if return_code == -27:
-        return_code = 0
 
     if (show_output):
         print(f'\n\nServer OUT:\n{stdout}')
@@ -55,8 +53,6 @@ def run_client(client_path, ciphersuite_id, out_file, show_output=True):
     stdout, stderr = p.communicate()
 
     return_code = p.returncode
-    if return_code == -27:
-        return_code = 0
 
     if (show_output):
         print(f'\n\nClient OUT:\n{stdout}')

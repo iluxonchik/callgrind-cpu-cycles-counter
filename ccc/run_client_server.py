@@ -43,6 +43,7 @@ def run(client_path, server_path, ciphersuite_list_file_path, srv_funcs_to_prof,
     num_cipheruites = len(ciphersuites)
     num_skipped_ciphersuites = 0
     num_procecessed_ciphersuites = 0
+    num_sigttou = 0
     print('OK')
 
     for sc_id, name, flags in ciphersuites:
@@ -80,6 +81,13 @@ def run(client_path, server_path, ciphersuite_list_file_path, srv_funcs_to_prof,
             print(f'\t\tServer: {srv_res} Client: {cli_res}')
             print('\t\tSkipping to next ciphersuite...\n')
             num_skipped_ciphersuites += 1
+
+            if -27 in (srv_res, cli_res):
+                # This here is sort of for debugging. If you're getting
+                # -27 return codes, make sure you're not compiling/linking
+                # with the "-pg" option
+                num_sigttou += 1
+
             continue
 
         print('\tParsing CPU Cycles...')
@@ -110,8 +118,12 @@ def run(client_path, server_path, ciphersuite_list_file_path, srv_funcs_to_prof,
     print(f'\tTotal CipherSuites:{num_cipheruites}'
     f'\nMeasured: {num_cipheruites - num_skipped_ciphersuites}\n'
     f'Skipped: {num_skipped_ciphersuites}')
+    print(f'Number of SIGTTOU signals: {num_sigttou}')
 
-    import pdb; pdb.set_trace()
+    if (num_sigttou > 0):
+        print('[!!!] SIGTTOU singals detected! Make sure you\'re not compiling'
+        '/linking with the "-pg" opiton (for gprof). You cannot use valgrind'
+        ' and grpof together.')
 
     for func_name in SRV_FUNCTIONS_TO_PROFILE:
         labels = []
