@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt; plt.rcdefaults()
 import subprocess
 import re
 
@@ -61,3 +62,12 @@ def run_client(client_path, ciphersuite_id, out_file, show_output=True):
         print(f'\n\nClient OUT:\n{stdout}')
         print(f'\n\nClient ERR:\n{stderr}')
     return return_code
+
+
+def show_plot(values, labels, func_name, suffix):
+    y_pos = range(len(labels))
+    plt.bar(y_pos, values, align='center', alpha=0.5)
+    plt.xticks(y_pos, labels)
+    plt.ylabel(f'CPU Cycles For {func_name}')
+    plt.title(f'Ciphersuite Comparison For {suffix}')
+    plt.show()

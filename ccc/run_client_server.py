@@ -2,15 +2,14 @@ import time
 import argparse
 from multiprocessing.pool import ThreadPool
 
-from ccc import parse_ciphersuite_list_from_file, run_server, run_client, get_cc_from_callgrind_file
+from ccc import parse_ciphersuite_list_from_file, run_server, run_client, get_cc_from_callgrind_file, show_plot
 
 def run(client_path, server_path, ciphersuite_list_file_path, srv_funcs_to_prof, cli_funcs_to_prof, timeout=2, verbose=False):
     SERVER_CALLGRIND_OUT_FILE = 'callgrind.out.server.{}'
     CLIENT_CALLGRIND_OUT_FILE = 'callgrind.out.client.{}'
-    # { 'sc_id': [{'function_name', 'number_of_cycles'}] }
+    # { 'sc_id': {'function_name', 'number_of_cycles'} }
     PROFILE_RESULTS_SRV = {}
     PROFILE_RESULTS_CLI = {}
-
 
     # User-defined args
     CLIENT_PATH = client_path
@@ -88,28 +87,45 @@ def run(client_path, server_path, ciphersuite_list_file_path, srv_funcs_to_prof,
         time.sleep(TIMEOUT)
         print(f'\t\tWaiting {TIMEOUT} seconds for callgrind output to flush...')
         print('\t\tParsing server....')
-        PROFILE_RESULTS_SRV[sc_id] = []
+        PROFILE_RESULTS_SRV[sc_id] = {}
         for function_name in SRV_FUNCTIONS_TO_PROFILE:
             num_cc = get_cc_from_callgrind_file(callgrind_out_srv, function_name)
             print(f'\t\t\t{function_name}: {num_cc}')
-            PROFILE_RESULTS_SRV[sc_id].append({function_name: num_cc})
+            PROFILE_RESULTS_SRV[sc_id][function_name] = num_cc
 
         #   5.2 Client
         print('\t\tParsing client...')
-        PROFILE_RESULTS_CLI[sc_id] = []
+        PROFILE_RESULTS_CLI[sc_id] = {}
         for function_name in CLI_FUNCTIONS_TO_PROFILE:
             num_cc = get_cc_from_callgrind_file(callgrind_out_cli, function_name)
             print(f'\t\t\t{function_name}: {num_cc}')
-            PROFILE_RESULTS_CLI[sc_id].append({function_name: num_cc})
+            PROFILE_RESULTS_CLI[sc_id][function_name] = num_cc
 
         print(f'--- End profiling for {sc_id} : {name} : {flags} [{num_procecessed_ciphersuites}/{num_cipheruites}] ---\n')
 
     print('--- STATISTICS ---')
     print(f'\tTotal CipherSuites:{num_cipheruites}'
-    '\nMeasured: {num_cipheruites - num_skipped_ciphersuites}\n'
-    'Skipped: {num_skipped_ciphersuites}')
+    f'\nMeasured: {num_cipheruites - num_skipped_ciphersuites}\n'
+    f'Skipped: {num_skipped_ciphersuites}')
 
     import pdb; pdb.set_trace()
+
+    for func_name in SRV_FUNCTIONS_TO_PROFILE:
+        labels = []
+        values = []
+        for key, value in PROFILE_RESULTS_SRV.items():
+            labels.append(key)
+            values.append(value[func_name])
+        show_plot(values, labels, func_name, 'Server')
+
+    for func_name in CLI_FUNCTIONS_TO_PROFILE:
+        labels = []
+        values = []
+        for key, value in PROFILE_RESULTS_CLI.items():
+            labels.append(key)
+            values.append(value[func_name])
+        show_plot(values, labels, func_name, 'Server')
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run mbedTLS server and client program and collect profiling metrics for a list of ciphersuties.')
