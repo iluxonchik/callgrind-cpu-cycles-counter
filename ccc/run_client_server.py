@@ -44,7 +44,8 @@ def run(client_path, server_path, ciphersuite_list_file_path, srv_funcs_to_prof,
     num_skipped_ciphersuites = 0
     num_procecessed_ciphersuites = 0
     num_sigttou = 0
-    print('OK')
+    ciphersuite_names = []  # display names in graph
+    print('ok')
 
     for sc_id, name, flags in ciphersuites:
         """
@@ -112,6 +113,8 @@ def run(client_path, server_path, ciphersuite_list_file_path, srv_funcs_to_prof,
             print(f'\t\t\t{function_name}: {num_cc}')
             PROFILE_RESULTS_CLI[sc_key][function_name] = num_cc
 
+        ciphersuite_names += [name]
+
         print(f'--- End profiling for {sc_id} : {name} : {flags} [{num_procecessed_ciphersuites}/{num_cipheruites}] ---\n')
 
     print('--- STATISTICS ---')
@@ -131,7 +134,7 @@ def run(client_path, server_path, ciphersuite_list_file_path, srv_funcs_to_prof,
         for key, value in PROFILE_RESULTS_SRV.items():
             labels.append(key)
             values.append(value[func_name])
-        show_plot(values, labels, func_name, 'Server')
+        show_plot(values, labels, func_name, ciphersuite_names, 'Server')
 
     for func_name in CLI_FUNCTIONS_TO_PROFILE:
         labels = []
@@ -139,7 +142,7 @@ def run(client_path, server_path, ciphersuite_list_file_path, srv_funcs_to_prof,
         for key, value in PROFILE_RESULTS_CLI.items():
             labels.append(key)
             values.append(value[func_name])
-        show_plot(values, labels, func_name, 'Server')
+        show_plot(values, labels, func_name, ciphersuite_names, 'Client')
 
 
 if __name__ == '__main__':

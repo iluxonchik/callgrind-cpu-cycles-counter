@@ -60,7 +60,7 @@ def run_client(client_path, ciphersuite_id, out_file, show_output=True):
     return return_code
 
 
-def show_plot(values, labels, func_name, suffix):
+def show_plot(values, labels, func_name, ciphersuite_names, suffix):
     fig, ax = plt.subplots()
     ax.get_yaxis().get_major_formatter().set_scientific(False)
     y_pos = range(len(labels))
@@ -71,11 +71,11 @@ def show_plot(values, labels, func_name, suffix):
     plt.title(f'Ciphersuite Comparison For {suffix}')
 
     max_val = max(values)
-    half_max = max_val/2
+    label_pos = max_val/2 + max_val/3
 
 
     for i, v in enumerate(values):
-        ax.text(i - 0.25, half_max, str(v) + labels[i], rotation='vertical')
+        ax.text(i - 0.25, label_pos, f'{v} | {ciphersuite_names[i]}', rotation='vertical')
 
     #plt.tight_layout()
 
