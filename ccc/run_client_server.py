@@ -4,6 +4,14 @@ from multiprocessing.pool import ThreadPool
 
 from ccc import parse_ciphersuite_list_from_file, run_server, run_client, get_cc_from_callgrind_file, show_plot
 
+def build_key(sc_id, name, flags):
+    flag_to_use = ''
+    if flags.lower() != 'none':
+        flag_to_use = f'[{flags}] '
+    key = f'{flag_to_use}{sc_id}'
+    return key
+
+
 def run(client_path, server_path, ciphersuite_list_file_path, srv_funcs_to_prof, cli_funcs_to_prof, timeout=2, verbose=False):
     SERVER_CALLGRIND_OUT_FILE = 'callgrind.out.server.{}'
     CLIENT_CALLGRIND_OUT_FILE = 'callgrind.out.client.{}'
@@ -56,11 +64,6 @@ def run(client_path, server_path, ciphersuite_list_file_path, srv_funcs_to_prof,
 
         print(f'\tStarting server... (Out file: {callgrind_out_srv})')
 
-        if sc_id == '49311':
-            verbose = True
-        else:
-            verbose = False
-
         async_result_srv = pool.apply_async(run_server, (SERVER_PATH, sc_id, callgrind_out_srv, verbose))
 
         print(f'\t\tWaiting {TIMEOUT} seconds for server to load...')
@@ -82,24 +85,24 @@ def run(client_path, server_path, ciphersuite_list_file_path, srv_funcs_to_prof,
         print('\tParsing CPU Cycles...')
 
         # 5. Parse the cycles for selected functions
-
+        sc_key = build_key(sc_id, name, flags)
         #    5.1 Server
         time.sleep(TIMEOUT)
         print(f'\t\tWaiting {TIMEOUT} seconds for callgrind output to flush...')
         print('\t\tParsing server....')
-        PROFILE_RESULTS_SRV[sc_id] = {}
+        PROFILE_RESULTS_SRV[sc_key] = {}
         for function_name in SRV_FUNCTIONS_TO_PROFILE:
             num_cc = get_cc_from_callgrind_file(callgrind_out_srv, function_name)
             print(f'\t\t\t{function_name}: {num_cc}')
-            PROFILE_RESULTS_SRV[sc_id][function_name] = num_cc
+            PROFILE_RESULTS_SRV[sc_key][function_name] = num_cc
 
         #   5.2 Client
         print('\t\tParsing client...')
-        PROFILE_RESULTS_CLI[sc_id] = {}
+        PROFILE_RESULTS_CLI[sc_key] = {}
         for function_name in CLI_FUNCTIONS_TO_PROFILE:
             num_cc = get_cc_from_callgrind_file(callgrind_out_cli, function_name)
             print(f'\t\t\t{function_name}: {num_cc}')
-            PROFILE_RESULTS_CLI[sc_id][function_name] = num_cc
+            PROFILE_RESULTS_CLI[sc_key][function_name] = num_cc
 
         print(f'--- End profiling for {sc_id} : {name} : {flags} [{num_procecessed_ciphersuites}/{num_cipheruites}] ---\n')
 

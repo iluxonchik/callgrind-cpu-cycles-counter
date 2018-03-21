@@ -65,9 +65,22 @@ def run_client(client_path, ciphersuite_id, out_file, show_output=True):
 
 
 def show_plot(values, labels, func_name, suffix):
+    fig, ax = plt.subplots()
+    ax.get_yaxis().get_major_formatter().set_scientific(False)
     y_pos = range(len(labels))
     plt.bar(y_pos, values, align='center', alpha=0.5)
-    plt.xticks(y_pos, labels)
+    plt.xticks(y_pos, labels, rotation='vertical')
+    plt.yticks()
     plt.ylabel(f'CPU Cycles For {func_name}')
     plt.title(f'Ciphersuite Comparison For {suffix}')
+
+    max_val = max(values)
+    half_max = max_val/2
+
+
+    for i, v in enumerate(values):
+        ax.text(i - 0.25, half_max, str(v) + labels[i], rotation='vertical')
+
+    #plt.tight_layout()
+
     plt.show()
