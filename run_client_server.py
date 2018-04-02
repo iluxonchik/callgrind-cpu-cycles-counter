@@ -1,8 +1,10 @@
+#!/usr/bin/env python3
+import os
 import time
 import argparse
 from multiprocessing.pool import ThreadPool
 
-from ccc import parse_ciphersuite_list_from_file, run_server, run_client, get_cc_from_callgrind_file, show_plot
+from ccc.ccc import parse_ciphersuite_list_from_file, run_server, run_client, get_cc_from_callgrind_file, show_plot
 
 def build_key(sc_id, name, flags):
     flag_to_use = ''
@@ -12,7 +14,9 @@ def build_key(sc_id, name, flags):
     return key
 
 
-def run(client_path, server_path, ciphersuite_list_file_path, srv_funcs_to_prof, cli_funcs_to_prof, timeout=2, verbose=False):
+def run(client_path, server_path, ciphersuite_list_file_path,
+        srv_funcs_to_prof, cli_funcs_to_prof, keep_callgrind_out,
+        timeout, verbose=False):
     SERVER_CALLGRIND_OUT_FILE = 'callgrind.out.server.{}'
     CLIENT_CALLGRIND_OUT_FILE = 'callgrind.out.client.{}'
     # { 'sc_id': {'function_name', 'number_of_cycles'} }
@@ -34,6 +38,7 @@ def run(client_path, server_path, ciphersuite_list_file_path, srv_funcs_to_prof,
     print(f'\tCiphesuite List Path: {CIPHERSUITE_LIST_PATH}')
     print(f'\tServer Funcs To Prof: {SRV_FUNCTIONS_TO_PROFILE}')
     print(f'\tClient Funcs To Prof: {CLI_FUNCTIONS_TO_PROFILE}')
+    print(f'\tKeep Callgrind Output Files: {keep_callgrind_out}')
     print(f'\tTimeout: {TIMEOUT}')
     print(f'\tVerbose: {VERBOSE}')
     print('\n')
@@ -46,6 +51,8 @@ def run(client_path, server_path, ciphersuite_list_file_path, srv_funcs_to_prof,
     num_sigttou = 0
     ciphersuite_names = []  # display names in graph
     print('ok')
+
+    produced_callgrind_out_files = [] # we don't want to delete any callgrind files from previous runs
 
     for sc_id, name, flags in ciphersuites:
         """
@@ -76,7 +83,7 @@ def run(client_path, server_path, ciphersuite_list_file_path, srv_funcs_to_prof,
 
         srv_res = async_result_srv.get()
         cli_res = async_result_cli.get()
-
+        produced_callgrind_out_files += [callgrind_out_cli, callgrind_out_srv]
         if srv_res != 0 or cli_res != 0:
             print(f'\n\t[!!!] Non-zero return code from ciphersuite {sc_id} {name} {flags}')
             print(f'\t\tServer: {srv_res} Client: {cli_res}')
@@ -144,6 +151,14 @@ def run(client_path, server_path, ciphersuite_list_file_path, srv_funcs_to_prof,
             values.append(value[func_name])
         show_plot(values, labels, func_name, ciphersuite_names, 'Client')
 
+    if not keep_callgrind_out:
+        print('Removing callgrind output files...')
+        for file_name in produced_callgrind_out_files:
+            try:
+                os.remove(file_name)
+            except Exception:
+                print(f'\t[!!!] Could not delete f{file_name}')
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run mbedTLS server and client program and collect profiling metrics for a list of ciphersuties.')
@@ -152,9 +167,11 @@ if __name__ == '__main__':
     parser.add_argument('ciphersuite_list', type=str, help='path to file containing a list of cipherstuies (format per line: ciphersuite_ID ciphersutie_name ciphersuite_flags)')
     parser.add_argument('--sf', nargs='*', help='name of server functions to profile')
     parser.add_argument('--cf', nargs='*', help='name of client functions to profile')
+    parser.add_argument('-k', '--keep-callgrind-output', action='store_true', default=False, help='Keep the output callgrind files after the program has finished running')
     parser.add_argument('-t', '--timeout', type=int, default=2, help='time to wait after starting the server before starting the client')
     parser.add_argument('-v', '--verbose', action='store_true', default=False, help='Enable verbose output')
 
     args = parser.parse_args()
 
-    run(args.client, args.server, args.ciphersuite_list, args.sf, args.cf, args.timeout, args.verbose)
+    run(args.client, args.server, args.ciphersuite_list, args.sf, args.cf,
+        args.keep_callgrind_output, args.timeout, args.verbose)
