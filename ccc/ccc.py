@@ -19,7 +19,7 @@ def get_cc_from_callgrind_output(content, func_name):
     res = pattern.search(content)
 
     func_id = res.group('func_id')
-    REGEX = fr'cfn=\({func_id}\).*?\ncalls=.+\n\d+ (?P<cpu_cycles>\d+)'
+    REGEX = fr'cfn=\({func_id}\).*?\ncalls=.+\n.+? (?P<cpu_cycles>\d+)'
     pattern = re.compile(REGEX)
     res = pattern.search(content)
     return int(res.group('cpu_cycles'))
