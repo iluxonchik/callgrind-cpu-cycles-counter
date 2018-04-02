@@ -84,6 +84,9 @@ optional arguments:
 
 ```
 
+The callgrind output files have the following format:
+`callgrind.out.<client/server>.<ciphersuite_id>` where `<client/server>` either the string `client` or `server` and `<ciphersuite_id>` is the numeric id of the ciphersuite. This allows you to easily examine the output files (e.g. call graph).
+
 # Examples
 
 The [examples]() folder has the example input programs that you can
