@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import json
 from os import listdir
 from os.path import isfile, join
 import re
@@ -72,7 +73,13 @@ def parse_callgrind_cpu_cycles_from_files(funcs, cipher_id_file, entity):
 
     return profiling
 
-def run(ciphers_file_path, path, cli_funcs, srv_funcs):
+def dump_json_ids(cli_profiling, srv_profiling, file_name):
+    obj = {'client': cli_profiling, 'server': srv_profiling}
+    res = json.dumps(obj)
+    with open(file_name, 'w') as out_file:
+        out_file.write(res)
+
+def run(ciphers_file_path, path, cli_funcs, srv_funcs, json_ids_file):
     ciphersuite_name = parse_ciphersuite_names_from_file(ciphers_file_path)
     ciphersuite_order = ciphersuite_name.keys()  # follow the ordre of the file
 
@@ -85,6 +92,10 @@ def run(ciphers_file_path, path, cli_funcs, srv_funcs):
     # {function_name : {ciphersuite_id : num_cycles}}
     CLI_FUNCS_PROFILING = parse_callgrind_cpu_cycles_from_files(cli_funcs, cipher_id_file_cli, 'client')
     SRV_FUNCS_PROFILING = parse_callgrind_cpu_cycles_from_files(srv_funcs, cipher_id_file_srv, 'server')
+
+    if json_ids_file is not None:
+        print(f'Dumping profiling resutls to {json_ids_file}...')
+        dump_json_ids(CLI_FUNCS_PROFILING, SRV_FUNCS_PROFILING, json_ids_file)
 
     # TODO: graph results
 
@@ -99,6 +110,7 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--path', type=str, default='./', help='path of the callgrind output files')
     parser.add_argument('--sf', nargs='*', default=[], help='name of server functions to profile')
     parser.add_argument('--cf', nargs='*', default=[], help='name of client functions to profile')
+    parser.add_argument('--json-ids', type=str, default=None, help='output JSON file with the profiling results. The keys of the ciphersuites are its ids')
 
     args = parser.parse_args()
 
@@ -106,4 +118,4 @@ if __name__ == '__main__':
         args.path += '/'
 
 
-    run(args.ciphers, args.path, args.cf, args.sf)
+    run(args.ciphers, args.path, args.cf, args.sf, args.json_ids)
