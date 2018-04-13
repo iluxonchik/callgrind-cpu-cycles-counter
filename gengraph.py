@@ -6,7 +6,7 @@ from os.path import isfile, join
 import re
 import argparse
 from collections import OrderedDict, defaultdict
-from ccc.ccc import get_cc_from_callgrind_file
+from ccc.ccc import get_cc_from_callgrind_file, show_plot
 
 def parse_ciphersuite_names_from_file(ciphers_file_path):
     CIPHER_ID_NAME_REGEX = r'(?P<id>\d+) (?P<name>[^ ]*?)( |$|\r?\n)'
@@ -66,6 +66,7 @@ def parse_callgrind_cpu_cycles_from_files(funcs, cipher_id_file, entity):
 
         for cipher_id, file_name in cipher_id_file.items():
             print(f'\tparsing for ciphersuite {cipher_id}...')
+            cipher_id = int(cipher_id)
             num_cycles = get_cc_from_callgrind_file(file_name, func)
             profiling[func][cipher_id] = num_cycles
 
@@ -78,6 +79,46 @@ def dump_json_ids(cli_profiling, srv_profiling, file_name):
     res = json.dumps(obj)
     with open(file_name, 'w') as out_file:
         out_file.write(res)
+
+def print_total_ciphers_profiled_stats(cli_prof, srv_prof, cli_funcs, srv_funcs):
+    print('Total client ciphersuites profiled: ', end='')
+    num_cli_ciphers = 0
+    if len(cli_funcs) > 0:
+        first_func = cli_funcs[0]
+        num_cli_ciphers = len(cli_prof[first_func])
+    print(num_cli_ciphers)
+
+    print('Total server ciphersuites profiled: ', end='')
+    num_srv_ciphers = 0
+    if len(srv_funcs) > 0:
+        first_func = srv_funcs[0]
+        num_srv_ciphers = len(cli_prof[first_func])
+    print(num_srv_ciphers)
+
+def dump_json_ids_if_needed(json_ids_file, cli_prof, srv_prof):
+    if json_ids_file is not None:
+            print(f'Dumping profiling resutls to {json_ids_file}...')
+            dump_json_ids(cli_prof, srv_prof, json_ids_file)
+
+def plot_from_profiling(func_names, profiling, ciphersuites_ids_to_graph, ciphersuite_id_to_name, entity):
+    for func_name in func_names:
+        func_profiling = profiling[func_name]
+
+        values = []
+        labels = []
+        ciphersuite_names = []
+        num_ciphersuites_graphed = 0
+        for ciphersuite_id in ciphersuites_ids_to_graph:
+            profiling_res = func_profiling.get(ciphersuite_id, None)
+            if profiling_res is None:
+                continue
+            values.append(profiling_res)
+            labels.append(ciphersuite_id)
+            ciphersuite_names.append(ciphersuite_id_to_name[ciphersuite_id])
+
+        total_ciphers = len(values)
+        suffix = f'{entity} (Total: {total_ciphers})'
+        show_plot(values, labels, func_name, ciphersuite_names, suffix)
 
 def run(ciphers_file_path, path, cli_funcs, srv_funcs, json_ids_file):
     ciphersuite_name = parse_ciphersuite_names_from_file(ciphers_file_path)
@@ -93,12 +134,11 @@ def run(ciphers_file_path, path, cli_funcs, srv_funcs, json_ids_file):
     CLI_FUNCS_PROFILING = parse_callgrind_cpu_cycles_from_files(cli_funcs, cipher_id_file_cli, 'client')
     SRV_FUNCS_PROFILING = parse_callgrind_cpu_cycles_from_files(srv_funcs, cipher_id_file_srv, 'server')
 
-    if json_ids_file is not None:
-        print(f'Dumping profiling resutls to {json_ids_file}...')
-        dump_json_ids(CLI_FUNCS_PROFILING, SRV_FUNCS_PROFILING, json_ids_file)
+    print_total_ciphers_profiled_stats(CLI_FUNCS_PROFILING, SRV_FUNCS_PROFILING, cli_funcs, srv_funcs)
+    dump_json_ids_if_needed(json_ids_file, CLI_FUNCS_PROFILING, SRV_FUNCS_PROFILING)
 
-    # TODO: graph results
-
+    plot_from_profiling(cli_funcs, CLI_FUNCS_PROFILING, ciphersuite_order, ciphersuite_name, 'Client')
+    plot_from_profiling(srv_funcs, SRV_FUNCS_PROFILING, ciphersuite_order, ciphersuite_name, 'Server')
 
 
 if __name__ == '__main__':
@@ -111,6 +151,7 @@ if __name__ == '__main__':
     parser.add_argument('--sf', nargs='*', default=[], help='name of server functions to profile')
     parser.add_argument('--cf', nargs='*', default=[], help='name of client functions to profile')
     parser.add_argument('--json-ids', type=str, default=None, help='output JSON file with the profiling results. The keys of the ciphersuites are its ids')
+    #TODO: json-cipher-names
 
     args = parser.parse_args()
 
