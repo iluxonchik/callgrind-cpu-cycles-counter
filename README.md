@@ -142,6 +142,38 @@ wrapped with `valgrind` like so: `valgrind --tool=callgrind --callgrind-out-file
 parses the number of CPU Cycles for the user-provided function name(s) from
 the `<out_file>`. It then uses those numbers to produce a graph.
 
+# Graph Generator tool
+
+The graph generator tool allows you to generate graphs from
+existing `callgrind.out.*` files. With this, you can obtain
+graphs in seconds. The tool is also capable of exporting
+profiling data into `JSON` format.
+
+```
+usage: gengraph.py [-h] [-p PATH] [--sf [SF [SF ...]]] [--cf [CF [CF ...]]]
+                   [--json-ids JSON_IDS]
+                   ciphers
+
+Generate graph from existing callgrind ouput files.The file name format file
+must be: callgrind.out.[client||server].<ciphersuite_id>.If you need to change
+the output graph, edit the code directly.
+
+positional arguments:
+  ciphers               file containing a list of ciphersuite ids and their
+                        respective names.Each line of the file must have the
+                        format: <ciphersuite_id> <ciphersuite_name>
+                        [arbitrary_info, ...]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PATH, --path PATH  path of the callgrind output files
+  --sf [SF [SF ...]]    name of server functions to profile
+  --cf [CF [CF ...]]    name of client functions to profile
+  --json-ids JSON_IDS   output JSON file with the profiling results. The keys
+                        of the ciphersuites are its ids
+
+```
+
 # Who Is This For
 
 Please note, this tool was written to solve a specific need quickly.
