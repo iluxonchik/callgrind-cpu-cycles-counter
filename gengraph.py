@@ -3,10 +3,11 @@ import os
 import json
 from os import listdir
 from os.path import isfile, join
+import matplotlib.pyplot as plt; plt.rcdefaults()
 import re
 import argparse
 from collections import OrderedDict, defaultdict
-from ccc.ccc import get_cc_from_callgrind_file, show_plot
+from ccc.ccc import get_cc_from_callgrind_file
 
 def parse_ciphersuite_names_from_file(ciphers_file_path):
     CIPHER_ID_NAME_REGEX = r'(?P<id>\d+) (?P<name>[^ ]*?)( |$|\r?\n)'
@@ -119,6 +120,27 @@ def plot_from_profiling(func_names, profiling, ciphersuites_ids_to_graph, cipher
         total_ciphers = len(values)
         suffix = f'{entity} (Total: {total_ciphers})'
         show_plot(values, labels, func_name, ciphersuite_names, suffix)
+
+def show_plot(values, labels, func_name, ciphersuite_names, suffix):
+    fig, ax = plt.subplots()
+    ax.get_yaxis().get_major_formatter().set_scientific(False)
+    y_pos = range(len(labels))
+    plt.bar(y_pos, values, align='center', alpha=0.5)
+    plt.xticks(y_pos, labels, rotation='vertical')
+    plt.yticks()
+    plt.ylabel(f'CPU Cycles For {func_name}')
+    plt.title(f'Ciphersuite Comparison For {suffix}')
+
+    max_val = max(values)
+    label_pos = max_val/2 + max_val/3
+
+
+    for i, v in enumerate(values):
+        ax.text(i - 0.25, label_pos, f'{v} | {ciphersuite_names[i]}', rotation='vertical')
+
+    #plt.tight_layout()
+
+    plt.show()
 
 def run(ciphers_file_path, path, cli_funcs, srv_funcs, json_ids_file):
     ciphersuite_name = parse_ciphersuite_names_from_file(ciphers_file_path)
