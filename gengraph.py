@@ -3,6 +3,7 @@ import os
 import json
 from os import listdir
 from os.path import isfile, join
+import matplotlib
 import matplotlib.pyplot as plt; plt.rcdefaults()
 import re
 import argparse
@@ -131,9 +132,11 @@ def show_plot(values, labels, func_name, ciphersuite_names, suffix):
     plt.ylabel(f'CPU Cycles For {func_name}')
     plt.title(f'Ciphersuite Comparison For {suffix}')
 
+    plt.margins(0) # graph bars start at y = 0, no margins on the right
+    plt.subplots_adjust(left=0.05, right=0.999)
+
     max_val = max(values)
     label_pos = max_val/2 + max_val/3
-
 
     for i, v in enumerate(values):
         ax.text(i - 0.25, label_pos, f'{v} | {ciphersuite_names[i]}', rotation='vertical')
@@ -180,5 +183,10 @@ if __name__ == '__main__':
     if args.path[-1] is not '/':
         args.path += '/'
 
+    font = {
+            'family' : 'normal',
+            'size'   : 7
+            }
+    matplotlib.rc('font', **font)
 
     run(args.ciphers, args.path, args.cf, args.sf, args.json_ids)
