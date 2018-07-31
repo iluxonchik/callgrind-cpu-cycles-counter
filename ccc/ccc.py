@@ -11,6 +11,14 @@ def parse_ciphersuite_list_from_file(file_path):
     with open(file_path, 'r') as sc_file:
         ciphersuites = [line.strip().split(' ') for line in sc_file.readlines()]
 
+    ciphersuites = [ciphersuite for ciphersuite in ciphersuites if len(ciphersuite) > 1]
+
+    for i in range(0, len(ciphersuites)):
+        ciphersuite = ciphersuites[i]
+        if len(ciphersuite) < 3:
+            ciphersuite.append('')
+        elif len(ciphersuite) > 3:
+            ciphersuites[i] = ciphersuite[0:2] + [' '.join(ciphersuite[2:])]
     return ciphersuites
 
 def get_cc_from_callgrind_output(content, func_name):
@@ -31,9 +39,15 @@ def get_cc_from_callgrind_file(callgrind_file, func_name):
 
     return get_cc_from_callgrind_output(file_content, func_name)
 
-def run_server(server_path, ciphersuite_id, out_file, show_output=True):
+def run_server(server_path, ciphersuite_id, out_file, show_output=True,
+               num_bytes_to_send=None):
+    srv_args = [server_path, str(ciphersuite_id)]
+
+    if num_bytes_to_send:
+        srv_args.append(str(num_bytes_to_send))
+
     args = ['valgrind', '--tool=callgrind', f'--callgrind-out-file={out_file}',
-            '--quiet', server_path, str(ciphersuite_id)]
+            '--quiet'] + srv_args
 
     p = subprocess.Popen(args, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
@@ -45,9 +59,16 @@ def run_server(server_path, ciphersuite_id, out_file, show_output=True):
         print(f'\n\nServer ERR:\n{stderr}')
     return return_code
 
-def run_client(client_path, ciphersuite_id, out_file, show_output=True):
+def run_client(client_path, ciphersuite_id, out_file, show_output=True,
+                num_bytes_to_send=None):
+
+    cli_args = [client_path, str(ciphersuite_id)]
+
+    if num_bytes_to_send:
+        cli_args.append(str(num_bytes_to_send))
+
     args = ['valgrind', '--tool=callgrind', f'--callgrind-out-file={out_file}',
-            '--quiet', client_path, str(ciphersuite_id)]
+            '--quiet'] + cli_args
 
     p = subprocess.Popen(args, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
