@@ -79,9 +79,6 @@ def run(client_path, server_path, ciphersuite_list_file_path,
     srv_bytes_to_send_list = list(range(srv_bytes_start, srv_bytes_end, srv_bytes_step))
     cli_bytes_to_send_list = list(range(cli_bytes_start, cli_bytes_end, cli_bytes_step))
 
-    srv_bytes_to_send_iter = iter(srv_bytes_to_send_list)
-    cli_bytes_to_send_iter = iter(cli_bytes_to_send_list)
-
     max_iter = max(srv_bytes_to_send_list, cli_bytes_to_send_list)
     total_iterations = len(max_iter) * num_cipheruites
 
@@ -95,10 +92,11 @@ def run(client_path, server_path, ciphersuite_list_file_path,
             else - continue
         4. Make sure that server ret coce == 0
             else - continue
-        5. Parse cycles for selected functions
         """
-        for _ in max_iter:
+        srv_bytes_to_send_iter = iter(srv_bytes_to_send_list)
+        cli_bytes_to_send_iter = iter(cli_bytes_to_send_list)
 
+        for _ in max_iter:
             cli_bytes_to_send = get_next_or_default(cli_bytes_to_send_iter,
                                                     DEFAULT_BYTES_TO_SEND)
             srv_bytes_to_send = get_next_or_default(srv_bytes_to_send_iter,
