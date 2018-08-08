@@ -33,7 +33,6 @@ def run(client_path, server_path, ciphersuite_list_file_path,
         out_dir, timeout, verbose=False):
     SERVER_CALLGRIND_OUT_FILE = '{}/server.callgrind.out.{}.{}.{}'
     CLIENT_CALLGRIND_OUT_FILE = '{}/client.callgrind.out.{}.{}.{}'
-    # { 'sc_id': {'function_name', 'number_of_cycles'} }
     PROFILE_RESULTS_SRV = {}
     PROFILE_RESULTS_CLI = {}
 
