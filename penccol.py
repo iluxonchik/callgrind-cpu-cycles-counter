@@ -7,15 +7,8 @@ from os import listdir
 from pathlib import Path
 from os.path import isfile, join
 from ccc.ccc import get_cc_from_callgrind_file
+from utils.utils import convert_dict_keys_to_str
 from collections import OrderedDict, defaultdict
-
-
-def convert_dict_keys_to_str(orig_dict):
-    if not isinstance(orig_dict, dict):
-        return orig_dict
-    dict_entries = ((str(key), convert_dict_keys_to_str(value))
-                    for key, value in orig_dict.items())
-    return dict(dict_entries)
 
 def verbose_print(msg, verbose, end='\n'):
     if verbose:
