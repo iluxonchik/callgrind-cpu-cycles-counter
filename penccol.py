@@ -9,40 +9,13 @@ from os.path import isfile, join
 from ccc.ccc import get_cc_from_callgrind_file
 from collections import OrderedDict, defaultdict
 
-def convert_dict_to_json(raw_dict):
-    """
-    Converts the non-string keys of the final result dictionary to string ones,
-    so that the dict can be dumped as JSON.
 
-    The code of this function is closely tied to the internal representation
-    of the final result dict. A change in it, would probably require the
-    chagne of this function's code as well.
-
-    NOTE: it's not the most Pythonic or elegant code you will find. It was
-    written "just to work".
-    """
-
-    def prefix_dict_to_json(prefix, raw_dict):
-        prefix_funcs = raw_dict[prefix]
-        res_dict = {prefix : {}}
-
-        for key_1, value_1 in prefix_funcs.items():
-                res_dict[prefix][key_1] = {}
-                for key_2, value_2 in value_1.items():
-                    str_key_2 = str(key_2)
-                    res_dict[prefix][key_1][str_key_2] = {}
-                    for key_3, value_3 in value_2.items():
-                        str_key_3 = str(key_3)
-                        res_dict[prefix][key_1][str_key_2][str_key_3] = value_3
-        return res_dict
-
-    res_dict = {}
-    for prefix in ['client', 'server']:
-        res = prefix_dict_to_json(prefix, raw_dict)
-        res_dict = {**res_dict, **res}
-        
-    return res_dict
-
+def convert_dict_keys_to_str(orig_dict):
+    if not isinstance(orig_dict, dict):
+        return orig_dict
+    dict_entries = ((str(key), convert_dict_keys_to_str(value))
+                    for key, value in orig_dict.items())
+    return dict(dict_entries)
 
 def verbose_print(msg, verbose, end='\n'):
     if verbose:
@@ -118,7 +91,7 @@ def parse_callgrind_cpu_cycles_from_files(funcs, cipher_id_file, entity):
     return profiling
 
 def write_dict_as_json_to_file(raw_dict, file_name):
-    json_dict = convert_dict_to_json(raw_dict)
+    json_dict = convert_dict_keys_to_str(raw_dict)
     res = json.dumps(json_dict)
     with open(file_name, 'w') as out_file:
         out_file.write(res)
