@@ -12,7 +12,7 @@ def parse_json_to_internal_dict(dictionary):
     def convert_to_literal(value):
         try:
             return ast.literal_eval(value)
-        except ValueError:
+        except (ValueError, SyntaxError):
             return value
 
     if not isinstance(dictionary, dict):
@@ -33,3 +33,4 @@ def parse_json_file_to_dict(path):
     """
     with open(path, 'r') as json_file:
         json_contents = json.load(json_file, object_hook=parse_json_to_internal_dict)
+    return json_contents

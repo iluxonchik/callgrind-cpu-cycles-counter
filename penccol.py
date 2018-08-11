@@ -89,7 +89,8 @@ def write_dict_as_json_to_file(raw_dict, file_name):
     with open(file_name, 'w') as out_file:
         out_file.write(res)
 
-def parse_cpu_cycles_for_ciphersuite(files_list, ciphersuite_id,
+def parse_cpu_cycles_for_ciphersuite(files_list,
+                                     ciphersuite_id, ciphersuite_name,
                                      funcs_to_profile, prefix, verbose=False):
     print(f'\tPrasing for {prefix} {ciphersuite_id}...  \t\t ', end='')
 
@@ -110,39 +111,51 @@ def parse_cpu_cycles_for_ciphersuite(files_list, ciphersuite_id,
         num_funcs_profiled += 1
         verbose_print(f'\t Profiling function {func_name}... ', verbose, end='')
 
+        ciphersuite_key = f'{ciphersuite_id} {ciphersuite_name}'
         res[func_name] = {
-            ciphersuite_id: {}
+            ciphersuite_key: {}
         }
 
         for filename, num_bytes_sent, num_bytes_received in cipher_id_files:
-            key = (num_bytes_sent, num_bytes_received)
+            num_bytes_key = (num_bytes_sent, num_bytes_received)
             num_cpu_cycles = get_cc_from_callgrind_file(filename, func_name)
-            res[func_name][ciphersuite_id][key] = num_cpu_cycles
+            res[func_name][ciphersuite_key][num_bytes_key] = num_cpu_cycles
 
             verbose_print(f'{num_cpu_cycles} CPU cycles for '
                           f'{num_bytes_sent}, {num_bytes_received}\n',
                           verbose)
     return res
 
-def parse_ciphersuites_profiling(ciphersuites, path, cli_funcs, srv_funcs,
-                                 verbose=False):
+def _join_ciphersuite_profilings(profilings, new_profiling, profiled_functions):
+    """
+    Note: expectes profilings to be a defaultdict(dict)
+    """
+    for func in profiled_functions:
+        profilings[func] = {
+                        **profilings[func],
+                        **new_profiling[func],
+                     }
+    return profilings
+
+def parse_ciphersuites_profiling(ciphersuite_names_dict, path,
+                                 cli_funcs, srv_funcs, verbose=False):
     CLI_PREFIX = 'client'
     SRV_PREFIX = 'server'
 
-    cli_profiling = {}
-    srv_profiling = {}
+    cli_profiling = defaultdict(dict)
+    srv_profiling = defaultdict(dict)
 
     files_in_dir = parse_filenames_list(path)
 
     num_files_in_dir = len(files_in_dir[CLI_PREFIX]) + len(files_in_dir[SRV_PREFIX])
-    num_cipheruites = len(ciphersuites)
+    num_cipheruites = len(ciphersuite_names_dict)
 
     num_ciphersuites_parsed = 0
 
     print(f'Begin parsing metrics for {num_cipheruites} ciphersuites. '
            f'Total files: {num_files_in_dir}')
 
-    for ciphersuite_id in ciphersuites:
+    for ciphersuite_id, ciphersuite_name in ciphersuite_names_dict.items():
         num_ciphersuites_parsed += 1
         verbose_print(f'--- Start parsing for ciphsersuite {ciphersuite_id} --- '
               f'[{num_ciphersuites_parsed}/{num_cipheruites}]', verbose)
@@ -150,24 +163,35 @@ def parse_ciphersuites_profiling(ciphersuites, path, cli_funcs, srv_funcs,
         cli_profiling_for_ciphersuite = parse_cpu_cycles_for_ciphersuite(
                                                                 files_in_dir[CLI_PREFIX],
                                                                 ciphersuite_id,
+                                                                ciphersuite_name,
                                                                 cli_funcs,
                                                                 CLI_PREFIX,
                                                                 verbose)
-
-        cli_profiling = {**cli_profiling, **cli_profiling_for_ciphersuite}
+        cli_profiling = _join_ciphersuite_profilings(
+                                                     cli_profiling,
+                                                     cli_profiling_for_ciphersuite,
+                                                     cli_funcs
+                                                    )
 
         # parse metrics for the server
         srv_profiling_for_ciphersuite = parse_cpu_cycles_for_ciphersuite(
                                                                 files_in_dir[SRV_PREFIX],
                                                                 ciphersuite_id,
+                                                                ciphersuite_name,
                                                                 cli_funcs,
                                                                 SRV_PREFIX,
                                                                 verbose)
-        srv_profiling = {**srv_profiling, **srv_profiling_for_ciphersuite}
+        srv_profiling = _join_ciphersuite_profilings(
+                                                     srv_profiling,
+                                                     srv_profiling_for_ciphersuite,
+                                                     srv_funcs
+                                                    )
 
         verbose_print(f'--- End parsing for ciphsersuite {ciphersuite_id} --- '
               f'[{num_ciphersuites_parsed}/{num_cipheruites}]', verbose)
+
     print(f'End parsing metrics. {num_ciphersuites_parsed} from {num_files_in_dir} files')
+
     return cli_profiling, srv_profiling
 
 def run(ciphers_file_path, path, cli_funcs, srv_funcs, out_file_name):
@@ -176,11 +200,12 @@ def run(ciphers_file_path, path, cli_funcs, srv_funcs, out_file_name):
     if not path.is_dir():
         raise Exception('Path argument must point to a directory')
 
-    ciphersuite_name = parse_ciphersuite_names_from_file(ciphers_file_path)
-    ciphersuite_order = ciphersuite_name.keys()  # follow the order of the files
+    ciphersuite_names_dict = parse_ciphersuite_names_from_file(ciphers_file_path)
 
-    cli_prof, srv_prof = parse_ciphersuites_profiling(ciphersuite_order, path,
-                                                      cli_funcs, srv_funcs)
+    cli_prof, srv_prof = parse_ciphersuites_profiling(ciphersuite_names_dict,
+                                                      path,
+                                                      cli_funcs,
+                                                      srv_funcs)
 
     profiling_res = {'client': cli_prof, 'server': srv_prof}
     write_dict_as_json_to_file(profiling_res, out_file_name)
