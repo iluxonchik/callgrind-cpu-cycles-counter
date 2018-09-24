@@ -140,6 +140,7 @@ def run(client_path, server_path, ciphersuite_list_file_path,
 
             srv_res = async_result_srv.get()
             cli_res = async_result_cli.get()
+            pool.close()
 
             if srv_res != 0 or cli_res != 0:
                 print(f'\n\t[!!!] Non-zero return code from ciphersuite {sc_id} {name} {flags}')
