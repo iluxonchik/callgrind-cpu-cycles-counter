@@ -46,7 +46,7 @@ def run_server(server_path, ciphersuite_id, out_file, show_output=True,
     if num_bytes_to_send:
         srv_args.append(str(num_bytes_to_send))
 
-    args = ['valgrind', '--tool=callgrind', f'--callgrind-out-file={out_file}',
+    args = ['valgrind', '--tool=callgrind', '--branch-sim=yes', '--cache-sim=yes', f'--callgrind-out-file={out_file}',
             '--quiet'] + srv_args
 
     p = subprocess.Popen(args, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -67,7 +67,7 @@ def run_client(client_path, ciphersuite_id, out_file, show_output=True,
     if num_bytes_to_send:
         cli_args.append(str(num_bytes_to_send))
 
-    args = ['valgrind', '--tool=callgrind', f'--callgrind-out-file={out_file}',
+    args = ['valgrind', '--tool=callgrind', '--branch-sim=yes', '--cache-sim=yes', f'--callgrind-out-file={out_file}',
             '--quiet'] + cli_args
 
     p = subprocess.Popen(args, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
