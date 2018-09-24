@@ -185,3 +185,11 @@ anything similar in the open-source community. You can use
 this code as an example to adapt it to your own needs.
 
 If you have any questions or need help, don't hesitate to contact me.
+
+
+# NOTE
+
+The original tool has been separated into multiple ones. `run.py` has
+been deprecated in favor of `penc.py` and `penccol.py`.
+
+The description will be updated when I'll have more time.
