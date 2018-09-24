@@ -3,6 +3,7 @@ import re
 import os
 import json
 import argparse
+import statistics
 from os import listdir
 from pathlib import Path
 from os.path import isfile, join
@@ -194,7 +195,74 @@ def parse_ciphersuites_profiling(ciphersuite_names_dict, path,
 
     return cli_profiling, srv_profiling
 
-def run(ciphers_file_path, path, cli_funcs, srv_funcs, out_file_name):
+def _aggregate_results_for_function(entity_funcs, funcs, cipher_prefixes):
+    entity_func_values = {}
+    for func_name in funcs:
+        entity_func = entity_funcs[func_name]
+        entity_values = OrderedDict((key, list()) for key in cipher_prefixes)
+        for key, value in entity_func.items():
+            for cipher_prefix in cipher_prefixes:
+                if key.split(' ')[1].startswith(f'{cipher_prefix}-WITH-'):
+                    func_values = list(value.values())
+                    num_cpu_cycles = func_values[0]
+                    entity_values[cipher_prefix].append(func_values[0])
+        entity_func_values[func_name] = entity_values
+    return entity_func_values
+
+def _calc_aggr_for_function(values, funcs):
+    aggr = OrderedDict()
+    for func_name in funcs:
+        value_funcs = values[func_name]
+        aggr[func_name] = OrderedDict()
+        for key, values in value_funcs.items():
+            avg = statistics.mean(values)
+            stdev = statistics.stdev(values)
+            aggr[func_name][key] = {
+                'avg' : avg,
+                'stdev' : stdev,
+            }
+
+    return aggr
+
+def aggregate_results(cli_prof, srv_prof, cli_funcs, srv_funcs):
+    """
+    Output format:
+    {
+        'client' : {
+                        '<func_name>': {
+                                            '<cipher_prefix>': {
+                                                               'avg': <num>,
+                                                               'stdev': <num>
+                                                               }
+                                        }
+                   }
+    }
+    """
+    cipher_prefixes = [
+                        'TLS-PSK',
+                        'TLS-RSA-PSK',
+                        'TLS-ECDHE-PSK',
+                        'TLS-RSA',
+                        'TLS-ECDH-RSA',
+                        'TLS-ECDHE-RSA',
+                        'TLS-DHE-PSK',
+                        'TLS-DHE-RSA',
+                        'TLS-ECDH-ECDSA',
+                        'TLS-ECDHE-ECDSA',
+                       ]
+    # client
+    cli_values = _aggregate_results_for_function(cli_prof, cli_funcs, cipher_prefixes)
+   
+    # server
+    srv_values = _aggregate_results_for_function(srv_prof, srv_funcs, cipher_prefixes)
+    
+    cli_aggr = _calc_aggr_for_function(cli_values, cli_funcs)
+    srv_aggr = _calc_aggr_for_function(srv_values, srv_funcs)
+
+    return cli_aggr, srv_aggr
+
+
+def run(ciphers_file_path, path, cli_funcs, srv_funcs, is_aggregate, out_file_name):
     path = Path(path)
 
     if not path.is_dir():
@@ -202,12 +270,17 @@ def run(ciphers_file_path, path, cli_funcs, srv_funcs, out_file_name):
 
     ciphersuite_names_dict = parse_ciphersuite_names_from_file(ciphers_file_path)
 
+
     cli_prof, srv_prof = parse_ciphersuites_profiling(ciphersuite_names_dict,
                                                       path,
                                                       cli_funcs,
                                                       srv_funcs)
 
+    if is_aggregate:
+        cli_prof, srv_prof = aggregate_results(cli_prof, srv_prof, cli_funcs, srv_funcs)
+
     profiling_res = {'client': cli_prof, 'server': srv_prof}
+
     write_dict_as_json_to_file(profiling_res, out_file_name)
 
 
@@ -225,6 +298,7 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--path', type=str, default='./', help='path of the callgrind output files')
     parser.add_argument('--sf', nargs='*', default=[], help='name of server functions to profile')
     parser.add_argument('--cf', nargs='*', default=[], help='name of client functions to profile')
+    parser.add_argument('-a', default=False, action='store_true', help='aggregate results by key exchange method')
     parser.add_argument('-o', '--output', type=str, default=None,
                              help='output JSON file with the profiling results. '
                              'The keys of the ciphersuites are its ids')
@@ -232,4 +306,4 @@ if __name__ == '__main__':
                         help='enable verbose output')
 
     args = parser.parse_args()
-    run(args.ciphers, args.path, args.cf, args.sf, args.output)
+    run(args.ciphers, args.path, args.cf, args.sf, args.a, args.output)
