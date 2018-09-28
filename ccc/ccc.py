@@ -1,6 +1,53 @@
 import matplotlib.pyplot as plt; plt.rcdefaults()
 import subprocess
 import re
+from utils.colors import print_green, print_red, print_yellow
+
+# warning message from cachegrind that L3 cache will be used as LL cache
+CACHEGRIND_L3_MSG = 'warning: L3 cache found, using its data for the LL simulation'
+
+def _filter_cachegrind_warnings(return_code, stderr, entity, show_output):
+    strerr = stderr.decode('utf-8')
+    if strerr.count('\n') > 1:
+        return return_code, stderr
+    
+    if CACHEGRIND_L3_MSG in strerr:
+        if(show_output):
+            print_yellow(f'\t{entity} ERR out: {stderr}')
+            print_yellow('\t\tManually setting return code to 0 and error message to \'\'...')
+        return_code = 0
+        stderr = b''
+    return return_code, stderr
+
+def _get_client_return_code(return_code, stdout, show_output):
+    CLIENT_OK_LAST_MSG = 'Last error was: -30848 - SSL - The peer notified us that the connection is going to be closed'
+    strout = stdout.decode('utf-8')
+    strout = strout.strip('\n')
+    last_out = strout.split('\n')[-1]
+    if last_out == CLIENT_OK_LAST_MSG:
+        return_code = 0
+        print_yellow(f'\tClient\'s last message was the expected one. Setting return code to 0...')
+    else:
+        return_code = -1
+        print_red(f'\tClient\'s last message was an unexpected one. Setting return code to -1...')
+        print_red(f'\tExpected: {CLIENT_OK_LAST_MSG}')
+        print_red(f'\nObtained: {last_out}')
+    return return_code
+
+def _get_server_return_code(return_code, stdout, show_output):
+    SERVER_OK_LAST_MSG = 'Terminating server...'
+    strout = stdout.decode('utf-8')
+    strout = strout.strip('\n')
+    last_out = strout.split('\n')[-1]
+    if last_out == SERVER_OK_LAST_MSG:
+        return_code = 0
+        print_yellow(f'\tServer\'s last message was the expected one. Setting return code to 0...')
+    else:
+        return_code = -1
+        print_red(f'\tServer\'s last message was an unexpected one. Setting return code to -1...')
+        print_red(f'\tExpected: {SERVER_OK_LAST_MSG}')
+        print_red(f'\nObtained: {last_out}')
+    return return_code
 
 def parse_ciphersuite_list_from_file(file_path):
     """Parses a list of ciphersuites from a file.
@@ -53,6 +100,9 @@ def run_server(server_path, ciphersuite_id, out_file, show_output=True,
     stdout, stderr = p.communicate()
 
     return_code = p.returncode
+    # hackfix | Do a proper when/if time is not so tight
+    # NOTE: this renders the sigttou signal count useless
+    return_code = _get_server_return_code(return_code, stdout, show_output)
 
     if (show_output):
         print(f'\n\nServer OUT:\n{stdout}')
@@ -74,7 +124,10 @@ def run_client(client_path, ciphersuite_id, out_file, show_output=True,
     stdout, stderr = p.communicate()
 
     return_code = p.returncode
-
+    # hackfix | Do a proper when/if time is not so tight
+    # NOTE: this renders the sigttou signal count useless
+    return_code = _get_client_return_code(return_code, stdout, show_output)
+    
     if (show_output):
         print(f'\n\nClient OUT:\n{stdout}')
         print(f'\n\nClient ERR:\n{stderr}')
