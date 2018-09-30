@@ -69,15 +69,56 @@ def parse_ciphersuite_list_from_file(file_path):
     return ciphersuites
 
 def get_cc_from_callgrind_output(content, func_name):
+    """
+    This functions, get the values from every cfn=(<fnc_id>) occurence.
+    "cfn" means "called function". The first row below "calls=<num> <num>"
+    contains the metrics. If we sum up all of the values from all of them,
+    we get the costs of all calls of the desired function, thus the total
+    cost of that function.
+
+    After the values are extracted, a formula is used to estimate the number
+    of CPU instructions.
+    """
+
+    # 1. Get function id <fn_id> 
+    # 2. Find all occurences of cfn=(<fn_id>)
+    # 3. Parse all values under each occurence
+    # 4. Sum them up, apply formula
+
     FUNC_ID_REGEX = fr'fn=\((?P<func_id>\d+)\) {func_name}\n'
     pattern = re.compile(FUNC_ID_REGEX)
     res = pattern.search(content)
 
     func_id = res.group('func_id')
-    REGEX = fr'cfn=\({func_id}\).*?\ncalls=.+\n.+? (?P<cpu_cycles>\d+)'
+
+    # this is probably the most unredable regex that I have written
+    REGEX = fr'cfn=\({func_id}\).*?\ncalls=.+\n.+? (?P<Ir>\d+) (?P<Dr>\d+) (?P<Dw>\d+) (?P<I1mr>\d+)( (?P<D1mr>\d+))?( (?P<D1mw>\d+))?( (?P<ILmr>\d+))?( (?P<DLmr>\d+))?( (?P<DLmw>\d+))?( (?P<Bc>\d+))?( (?P<Bcm>\d+))?( ?(?P<Bi>\d+))?( ?(?P<Bim>\d+))?'
     pattern = re.compile(REGEX)
-    res = pattern.search(content)
-    return int(res.group('cpu_cycles'))
+    matches = pattern.finditer(content)
+    matches = [match.groupdict(0) for match in matches]
+    matches = [{key: int(value) for key, value in match.items()} for match in matches]
+
+    Ir = sum(match['Ir'] for match in matches)
+    Dr = sum(match['Dr'] for match in matches)
+    Dw = sum(match['Dw'] for match in matches)
+    I1mr = sum(match['I1mr'] for match in matches)
+    D1mr = sum(match['D1mr'] for match in matches)
+    D1mw = sum(match['D1mw'] for match in matches)
+    ILmr = sum(match['ILmr'] for match in matches)
+    DLmr = sum(match['DLmr'] for match in matches)
+    DLmw = sum(match['DLmw'] for match in matches)
+    Bc = sum(match['Bc'] for match in matches)
+    Bcm = sum(match['Bcm'] for match in matches)
+    Bi = sum(match['Bi'] for match in matches)
+    Bim = sum(match['Bim'] for match in matches)
+
+    L1m = I1mr + D1mr + D1mw
+    LLm = ILmr + DLmr + DLmw
+    Bm = Bim + Bcm
+
+    CEst = Ir + 10*Bm + 10*L1m + 100*LLm
+
+    return CEst
 
 def get_cc_from_callgrind_file(callgrind_file, func_name):
     """Gets the number of CPU cycles for a function from a callgrind file."""
