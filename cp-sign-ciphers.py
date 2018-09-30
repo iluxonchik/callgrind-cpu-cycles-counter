@@ -19,7 +19,8 @@ def parse_cipher_ids_for_alg(ciphers_path, algorithm):
     for line in all_lines:
         line_sep = line.split(' ')
         cipher_id, cipher_name = line_sep[0], line_sep[1]
-        if algorithm in cipher_name:
+        spaced_cipher_name = f'{cipher_name} ' # allows to filter for SHA funcs
+        if algorithm in spaced_cipher_name:
             res.append(cipher_id)
     
     print_green(f'{len(res)} matching ciphers found!') 
