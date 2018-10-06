@@ -68,13 +68,16 @@ def parse_ciphersuite_list_from_file(file_path):
             ciphersuites[i] = ciphersuite[0:2] + [' '.join(ciphersuite[2:])]
     return ciphersuites
 
-def get_cc_from_callgrind_output(content, func_name):
+def get_cc_from_callgrind_output(content, func_name, called_by=None):
     """
     This functions, get the values from every cfn=(<fnc_id>) occurence.
     "cfn" means "called function". The first row below "calls=<num> <num>"
     contains the metrics. If we sum up all of the values from all of them,
     we get the costs of all calls of the desired function, thus the total
     cost of that function.
+
+    If called_by argument is provided, only func_name calls from within
+    caleld_by are counted.
 
     After the values are extracted, a formula is used to estimate the number
     of CPU instructions.
@@ -84,18 +87,29 @@ def get_cc_from_callgrind_output(content, func_name):
     # 2. Find all occurences of cfn=(<fn_id>)
     # 3. Parse all values under each occurence
     # 4. Sum them up, apply formula
-
     FUNC_ID_REGEX = fr'fn=\((?P<func_id>\d+)\) {func_name}\n'
     pattern = re.compile(FUNC_ID_REGEX)
     res = pattern.search(content)
 
     func_id = res.group('func_id')
 
-    # this is probably the most unredable regex that I have written
-    REGEX = fr'cfn=\({func_id}\).*?\ncalls=.+\n.+? (?P<Ir>\d+) (?P<Dr>\d+) (?P<Dw>\d+) (?P<I1mr>\d+)( (?P<D1mr>\d+))?( (?P<D1mw>\d+))?( (?P<ILmr>\d+))?( (?P<DLmr>\d+))?( (?P<DLmw>\d+))?( (?P<Bc>\d+))?( (?P<Bcm>\d+))?( ?(?P<Bi>\d+))?( ?(?P<Bim>\d+))?'
+    if called_by:
+        CALLER_FUNC_ID_REGEX = fr'fn=\((?P<func_id>\d+)\) {called_by}\n'
+        pattern = re.compile(CALLER_FUNC_ID_REGEX)
+        res = pattern.search(content)
+        caller_func_id = res.group('func_id')
+        # this is probably the most unredable regex that I have written
+        REGEX = fr'^fn=\({caller_func_id}\)(.|\n|\r)*?cfn=\({func_id}\).*?\ncalls=.+\n.+? (?P<Ir>\d+) (?P<Dr>\d+) (?P<Dw>\d+) (?P<I1mr>\d+)( (?P<D1mr>\d+))?( (?P<D1mw>\d+))?( (?P<ILmr>\d+))?( (?P<DLmr>\d+))?( (?P<DLmw>\d+))?( (?P<Bc>\d+))?( (?P<Bcm>\d+))?( ?(?P<Bi>\d+))?( ?(?P<Bim>\d+))?'
+    else:
+        # this is probably the most unredable regex that I have written
+        REGEX = fr'cfn=\({func_id}\).*?\ncalls=.+\n.+? (?P<Ir>\d+) (?P<Dr>\d+) (?P<Dw>\d+) (?P<I1mr>\d+)( (?P<D1mr>\d+))?( (?P<D1mw>\d+))?( (?P<ILmr>\d+))?( (?P<DLmr>\d+))?( (?P<DLmw>\d+))?( (?P<Bc>\d+))?( (?P<Bcm>\d+))?( ?(?P<Bi>\d+))?( ?(?P<Bim>\d+))?'
+    
     pattern = re.compile(REGEX)
-    matches = pattern.finditer(content)
+    matches = re.finditer(REGEX, content, flags=re.MULTILINE)
     matches = [match.groupdict(0) for match in matches]
+    if called_by:
+        # force first match only
+        matches = [matches[0]]
     matches = [{key: int(value) for key, value in match.items()} for match in matches]
 
     Ir = sum(match['Ir'] for match in matches)
@@ -120,12 +134,12 @@ def get_cc_from_callgrind_output(content, func_name):
 
     return CEst
 
-def get_cc_from_callgrind_file(callgrind_file, func_name):
+def get_cc_from_callgrind_file(callgrind_file, func_name, called_by=None):
     """Gets the number of CPU cycles for a function from a callgrind file."""
     with open(callgrind_file, 'r') as f:
         file_content = f.read()
-
-    return get_cc_from_callgrind_output(file_content, func_name)
+    
+    return get_cc_from_callgrind_output(file_content, func_name, called_by)
 
 def run_server(server_path, ciphersuite_id, out_file, show_output=True,
                num_bytes_to_send=None):

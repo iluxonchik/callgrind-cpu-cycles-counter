@@ -20,6 +20,7 @@ def build_key(sc_id, name, flags):
         flag_to_use = f'[{flags}] '
     key = f'{flag_to_use}{sc_id}'
     return key
+
 def create_output_directory_if_needed(out_dir):
     p = Path(out_dir)
     if not p.exists():
