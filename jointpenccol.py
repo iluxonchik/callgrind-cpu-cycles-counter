@@ -56,11 +56,18 @@ def parse_profilings(path, funcs, verbose=False):
     print(f'Begin parsing metrics | Total files: {num_files_in_dir}')
 
     for funcname in funcs:
+
+        called_by_split = funcname.split(':')
+        called_by = called_by_split[1] if len(called_by_split) == 2 else None
+        funcname = called_by_split[0] if called_by else funcname
+    
         minimum[funcname] = (sys.maxsize, None)
         maximum[funcname] = (0, None)
         for filename in files_in_dir:
             num_files_parsed += 1
-            num_instr = get_cc_from_callgrind_file(filename, funcname)
+            num_instr = get_cc_from_callgrind_file(filename, 
+                                                   funcname, 
+                                                   called_by)
             num_instr = int(num_instr)
             profilings[funcname].append(num_instr)
 
@@ -118,9 +125,9 @@ if __name__ == '__main__':
     '\t[client|server].callgrind.out.<ciphersuite_id>.<num_bytes_sent>.<num_bytes_received>')
 
     
-    parser.add_argument('path', type=str, default='./', help='path of the callgrind output files')
-    parser.add_argument('functions', nargs='*', default=[], help='name of server functions to profile')
-    parser.add_argument('output', type=str, help='output path of the JSON file with results')
+    parser.add_argument('path', type=str, default='./', help='Path of the callgrind output files')
+    parser.add_argument('functions', nargs='*', default=[], help='Name of functions to profile. Use the ":" separator for "called by" functionality.')
+    parser.add_argument('output', type=str, help='Output path of the JSON file with results.')
     parser.add_argument('-v', '--verbose', action='store_true', default=False,
                         help='enable verbose output')
 
